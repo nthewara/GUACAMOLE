@@ -1,0 +1,13 @@
+# Secrets / local env — never commit
+.env
+*.env
+secrets/
+initdb/
+
+# OS / editor cruft
+.DS_Store
+*.swp
+*~
+
+# Build logs
+*.log
