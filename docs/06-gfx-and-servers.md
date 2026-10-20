@@ -19,8 +19,9 @@ anything on. From the Guacamole manual:
 If you set nothing, GFX is active on every connection (and falls back gracefully
 if a server does not support it).
 
-> Reminder: GFX only actually engages when guacd is built against **FreeRDP 3.x**
-> (this repo). On a FreeRDP 2.x guacd the checkbox does nothing.
+> Reminder: GFX needs guacd **1.6.0 or newer**. It engages with both FreeRDP
+> 3.x builds (this repo) and FreeRDP 2.x builds (the official image). On guacd
+> 1.5.x and older the GFX channel does not exist.
 
 ## The server side must support GFX too
 
@@ -56,10 +57,40 @@ Caveats with Remote Login:
 
 ## How to confirm GFX is negotiating
 
-Watch `docker logs -f guacd` during a connection. With FreeRDP 3.x + a
-GFX-capable server, the pipeline negotiates automatically. If a connection is
-unusually slow or falls back, check:
+Watch `docker logs -f guacd` during a connection. With a GFX-capable server the
+pipeline negotiates automatically. Run guacd with `-L debug` to see it
+explicitly:
 
-1. guacd is the FreeRDP 3.x build (see `05-verify-troubleshoot.md`).
+```
+DEBUG:  Loading Dynamic Virtual Channel rdpgfx
+DEBUG:  RDPGFX channel will be used for the RDP Graphics Pipeline Extension.
+```
+
+On the Ubuntu side, `journalctl -u gnome-remote-desktop` (Remote Login) or
+`journalctl --user -u gnome-remote-desktop-headless` shows
+`[RDP.RDPGFX] CapsAdvertise: Accepting capability set with version RDPGFX_CAPVERSION_107`.
+
+With **Remote Login**, the guacd debug log also shows the handover from the
+login screen to your session as a server redirection
+(`redirFlags: ...LB_REDIRECTION_GUID...`), followed by GFX being negotiated
+again on the new session. That is expected.
+
+If a connection is unusually slow or falls back, check:
+
+1. guacd is 1.6.0+ (this repo's FreeRDP 3.x build — see `05-verify-troubleshoot.md`).
 2. `disable-gfx` is **not** set on the connection.
 3. The RDP server actually supports GFX (Windows, or `gnome-remote-desktop`).
+
+## Tested against
+
+October 2026, image `guacd:1.6.1-staging-freerdp3.32` (guacd `staging/1.6.1` @
+`59fa92b`, FreeRDP 3.32.2, Debian 13):
+
+| RDP server | Mode | Result |
+|------------|------|--------|
+| Ubuntu 26.04.1 LTS, gnome-remote-desktop 50.2 | Headless session | ✅ connects, GFX negotiated |
+| Ubuntu 26.04.1 LTS, gnome-remote-desktop 50.2 | **Remote Login** (GDM greeter → user session via server redirection) | ✅ login + handover, GFX negotiated |
+| xrdp 0.10.1 (Debian 13) | Xorg session | ✅ connects, GFX negotiated |
+
+Known gap: no audio from gnome-remote-desktop (see
+[`05-verify-troubleshoot.md`](05-verify-troubleshoot.md)).
