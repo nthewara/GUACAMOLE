@@ -1,13 +1,14 @@
 # Apache Guacamole — Custom guacd with FreeRDP 3.x + GFX
 
 Documentation and build recipe for compiling a **security-hardened `guacd`
-(Guacamole proxy daemon) against FreeRDP 3.x**, unlocking the RDP **Graphics
-Pipeline (GFX / RemoteFX)** extension that the official images do not provide.
+(Guacamole proxy daemon) against a current FreeRDP 3.x release**, with the RDP
+**Graphics Pipeline (GFX / RemoteFX)** extension enabled.
 
-> The official `guacamole/guacd` Docker image ships **FreeRDP 2.x**, which
-> lacks GFX. This repo documents how to build guacd **1.6.0 against
-> FreeRDP 3.28.0** to get GFX-accelerated RDP, how to deploy it alongside the
-> standard `guacamole/guacamole` web app and a database, and the gotchas we hit.
+> The official `guacamole/guacd` Docker image still ships **FreeRDP 2.11.7**
+> (on Alpine 3.18). This repo documents how to build guacd **1.6.1 (pre-release,
+> pinned `staging/1.6.1` commit) against FreeRDP 3.32.2**, how to deploy it
+> alongside the standard `guacamole/guacamole` web app and a database, and the
+> gotchas we hit.
 
 ## Contents
 
@@ -23,20 +24,20 @@ Pipeline (GFX / RemoteFX)** extension that the official images do not provide.
 ## TL;DR
 
 ```bash
-# 1. Build the custom guacd (FreeRDP 3.28.0 + GFX)
+# 1. Build the custom guacd (FreeRDP 3.32.2 + GFX)
 cd guacd-freerdp3
-docker build -t guacd:1.6.0-freerdp3.28 .
+docker build -t guacd:1.6.1-staging-freerdp3.32 .
 
 # 2. Scan it for vulnerabilities (security gate)
 docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
   aquasec/trivy:latest image --scanners vuln \
   --severity HIGH,CRITICAL --ignore-unfixed --no-progress \
-  guacd:1.6.0-freerdp3.28
+  guacd:1.6.1-staging-freerdp3.32
 
 # 3. Deploy on a user-defined network next to the web app + DB
 docker network create guac-net
 docker run -d --name guacd --restart always --network guac-net \
-  guacd:1.6.0-freerdp3.28
+  guacd:1.6.1-staging-freerdp3.32
 # ...then the guacamole/guacamole web app + database (see docs/03-deploy.md)
 ```
 
@@ -44,21 +45,38 @@ docker run -d --name guacd --restart always --network guac-net \
 
 | Component | Version |
 |-----------|---------|
-| guacamole-server (guacd) | 1.6.0 |
-| FreeRDP | 3.28.0 (pinned) |
+| guacamole-server (guacd) | 1.6.1 pre-release — `staging/1.6.1` @ `59fa92b` (pinned) |
+| FreeRDP | 3.32.2 (pinned) |
 | guacamole/guacamole (web) | 1.6.0 (`latest`) |
-| Base image | `debian:bookworm-slim` |
+| Base image | `debian:trixie-slim` (Debian 13) |
 | Runs as | non-root user |
 | GFX / RDPGFX | **enabled by default** (opt-out via `disable-gfx`) |
 
+> **Why a pre-release guacd?** guacd **1.6.0 crashes on every RDP connection
+> when built against FreeRDP ≥ 3.31.0** (it calls `gdi_init()` too early —
+> GUACAMOLE-2328). The fix is only on the upstream `staging/1.6.1` branch, so
+> the Dockerfile pins a commit from it. Switch to the `1.6.1` tag once Apache
+> releases it. See [`docs/02-build.md`](docs/02-build.md#7-guacd-160-crashes-with-freerdp--3310).
+
 ## Why not just use the official image?
 
-Apache Guacamole **1.6.0** added FreeRDP 3.x *support in source*, and it is the
-release that shipped the GFX / RemoteFX Graphics Pipeline. **However, the
-official `guacamole/guacd:1.6.0` Docker image still builds against FreeRDP 2.x
-on purpose** for compatibility. There is no official prebuilt image with
-FreeRDP 3.x, so to actually get GFX you must build guacd from source against
-FreeRDP 3.x — which is what this repo does.
+The official image is **functional**. Tested October 2026, the official
+`guacamole/guacd:1.6.0` image negotiates GFX and connects to Ubuntu 26.04 LTS
+`gnome-remote-desktop`, both headless and *Remote Login* (with server
+redirection). guacamole-server 1.6.0 enables GFX on FreeRDP 2.x builds too.
+
+The reason to build your own is **security currency**:
+
+- The official image bundles **FreeRDP 2.11.7** (April 2024). The FreeRDP 3.29
+  → 3.32.2 releases alone reference 158 security advisories. The 2.x line only
+  gets occasional backports, and the official image predates even the latest
+  of those (2.11.8, February 2026).
+- It is built on **Alpine 3.18**, which is end-of-life.
+- There is still no official image built against FreeRDP 3.x (the upstream
+  Dockerfile defaults to FreeRDP 2 even on `staging/1.6.1`).
+
+This repo builds guacd from source against the latest FreeRDP 3.x on a
+supported Debian base, and documents how to keep it current.
 
 ## Disclaimer
 

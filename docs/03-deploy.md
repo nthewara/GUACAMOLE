@@ -22,7 +22,7 @@ docker network create guac-net
 
 ```bash
 docker run -d --name guacd --restart always --network guac-net \
-  guacd:1.6.0-freerdp3.28
+  guacd:1.6.1-staging-freerdp3.32
 ```
 
 It listens on port **4822** (internal to `guac-net`; no host port needed).
@@ -74,7 +74,7 @@ docker stop guacd && docker rename guacd guacd-backup
 
 # start the new build
 docker run -d --name guacd --restart always --network guac-net \
-  guacd:1.6.0-freerdp3.28
+  guacd:1.6.1-staging-freerdp3.32
 
 # once confirmed working, remove the fallback
 docker rm guacd-backup
